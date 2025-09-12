@@ -193,7 +193,7 @@ export class Validator {
             icmpStatus = "UP";
             icmpLatency = pingTime;
             info(`✅ ICMP ping successful: ${pingTime}ms (packet loss: ${res.packetLoss}%)`);
-            break; // Success, exit retry loop
+            break; 
           } else {
             const reason = res.packetLoss === "100.000" 
               ? "100% packet loss" 
@@ -206,7 +206,7 @@ export class Validator {
             if (retryCount < maxPingRetries - 1) {
               warn(`   └─ Retrying in ${pingRetryDelay}ms...`);
               await new Promise(resolve => setTimeout(resolve, pingRetryDelay));
-              continue; // Try again
+              continue; 
             }
           }
         } else {
@@ -217,7 +217,7 @@ export class Validator {
         if (retryCount < maxPingRetries - 1) {
           warn(`   └─ Retrying in ${pingRetryDelay}ms...`);
           await new Promise(resolve => setTimeout(resolve, pingRetryDelay));
-          continue; // Try again
+          continue; 
         }
       }
     }
@@ -240,7 +240,6 @@ export class Validator {
       clearTimeout(to);
     }
 
-    // New final status logic (prioritize HTTP)
     const finalStatus: Status = httpStatus === "DOWN" ? "DOWN" : icmpStatus;
 
     let reportedLatency = 0;
@@ -252,7 +251,6 @@ export class Validator {
       }
     }
 
-    // Send vote via WebSocket
     try {
       const votePayload = {
         type: 'vote',
@@ -273,7 +271,7 @@ export class Validator {
 
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify(votePayload));
-        info(`✅ Validator ${this.id}@${this.location} → ${origin}`);
+        info(`Validator ${this.id}@${this.location} → ${origin}`);
         info(`   └─ ICMP ${icmpStatus === ("UP" as Status) ? "🟢" : "🔴"}: ${icmpLatency}ms`);
         info(`   └─ HTTP ${httpCode ?? "ERR"}: ${httpStatus}`);
         info(`   └─ Final: ${finalStatus} (Reported: ${reportedLatency}ms)`);
@@ -302,7 +300,6 @@ export class Validator {
       return;
     }
 
-    // Ensure timestamp is a valid ISO string
     const validTimestamp = (typeof timestamp === 'string' && !isNaN(new Date(timestamp).getTime()))
       ? timestamp
       : new Date().toISOString();
@@ -318,7 +315,6 @@ export class Validator {
 
     info(`Gossiping ${siteUrl} (${vote.status}) to ${this.peers.length} peers`);
     
-    // Add retry logic for each peer
     this.peers.forEach((peer) => {
       const maxRetries = 3;
       const retryDelay = 1000; // 1 second
@@ -335,14 +331,14 @@ export class Validator {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           
-          info(`🔗 Validator ${this.id} → ${peer}: ${vote.status}`);
+          info(`Validator ${this.id} → ${peer}: ${vote.status}`);
         } catch (error: unknown) {
           const err = error as Error;
           if (retryCount < maxRetries) {
             warn(`Retry ${retryCount + 1}/${maxRetries} for ${peer} after error: ${err.message}`);
             setTimeout(() => attemptGossip(retryCount + 1), retryDelay);
           } else {
-            info(`❌ Validator ${this.id} → ${peer} failed after ${maxRetries} retries: ${err.message}`);
+            info(`Validator ${this.id} → ${peer} failed after ${maxRetries} retries: ${err.message}`);
           }
         }
       };
@@ -357,6 +353,6 @@ export class Validator {
 
   public receiveGossip(siteUrl: string, vote: Vote, from: number): void {
     this.lastVotes.set(siteUrl, vote);
-    info(`🔄 Validator ${this.id} got gossip from ${from} for ${siteUrl}: ${vote.status}`);
+    info(`Validator ${this.id} got gossip from ${from} for ${siteUrl}: ${vote.status}`);
   }
 }

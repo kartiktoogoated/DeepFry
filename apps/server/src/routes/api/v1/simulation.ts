@@ -19,7 +19,6 @@ const peerAddresses = (process.env.PEERS ?? "")
   .map((h) => h.trim().replace(/^https?:\/\//, "").replace(/\/+$/, ""))
   .filter(Boolean)
   .map(peer => {
-    // Ensure peer has a port number
     if (!peer.includes(':')) {
       warn(`Peer ${peer} missing port number, defaulting to 3000`);
       return `${peer}:3000`;
@@ -27,7 +26,6 @@ const peerAddresses = (process.env.PEERS ?? "")
     return peer;
   });
 
-// Validate peer addresses
 peerAddresses.forEach(peer => {
   const [host, port] = peer.split(':');
   if (!host || !port || isNaN(Number(port))) {
@@ -50,7 +48,6 @@ if (process.env.IS_AGGREGATOR === "true") {
   });
 }
 
-// Add type for vote buffer
 interface VoteEntry {
   validatorId: number;
   status: 'UP' | 'DOWN';
@@ -104,13 +101,11 @@ export default function createSimulationRouter(
     try {
       const { site, vote, validatorId, latencyMs, timestamp, location } = req.body;
       
-      // Only aggregator processes quorum
       if (process.env.IS_AGGREGATOR === "true") {
         const key = `${site}__${timestamp}`;
         global.voteBuffer = global.voteBuffer || {};
         global.voteBuffer[key] = global.voteBuffer[key] || [];
         
-        // Add vote to buffer
         global.voteBuffer[key].push({
           validatorId,
           status: vote.status,
@@ -120,25 +115,21 @@ export default function createSimulationRouter(
           timestamp: Date.now()
         });
 
-        // Process quorum if we have enough votes
         const QUORUM = Math.ceil((process.env.VALIDATOR_IDS || '').split(',').length / 2);
         const CONSENSUS_WINDOW_MS = 5000; // 5 second window for retries
         
-        // Get the original timestamp from the key
         const [_, voteTimestamp] = key.split('__');
         const voteTime = new Date(voteTimestamp).getTime();
         const now = Date.now();
         
-        // Only process if we're past the consensus window
         if (now - voteTime >= CONSENSUS_WINDOW_MS) {
           if (global.voteBuffer[key].length >= QUORUM) {
             const upCount = global.voteBuffer[key].filter(e => e.status === 'UP').length;
             const consensus = upCount >= global.voteBuffer[key].length - upCount ? 'UP' : 'DOWN';
             
-            // Create consensus log
             await prisma.validatorLog.create({
               data: {
-                validatorId: 0, // Aggregator ID
+                validatorId: 0, 
                 site,
                 status: consensus,
                 latency: 0,
@@ -148,20 +139,16 @@ export default function createSimulationRouter(
 
             info(`✔️ Consensus for ${site}@${voteTimestamp}: ${consensus} (${upCount}/${global.voteBuffer[key].length} UP)`);
             
-            // Clear processed votes
             delete global.voteBuffer[key];
           } else {
-            // If we're past the window and don't have quorum, log a warning
             warn(`⚠️ No quorum reached for ${site}@${voteTimestamp} after ${CONSENSUS_WINDOW_MS}ms window (${global.voteBuffer[key].length}/${QUORUM} votes)`);
             delete global.voteBuffer[key];
           }
         } else {
-          // Still within window, waiting for more votes
-          info(`⏳ Waiting for more votes for ${site}@${voteTimestamp} (${global.voteBuffer[key].length}/${QUORUM} votes, ${Math.round((CONSENSUS_WINDOW_MS - (now - voteTime))/1000)}s remaining)`);
+          info(`Waiting for more votes for ${site}@${voteTimestamp} (${global.voteBuffer[key].length}/${QUORUM} votes, ${Math.round((CONSENSUS_WINDOW_MS - (now - voteTime))/1000)}s remaining)`);
         }
       }
-      
-      // All validators (including aggregator) should log the vote
+
       await prisma.validator.upsert({
         where: { id: validatorId },
         update: {},
@@ -171,7 +158,6 @@ export default function createSimulationRouter(
         }
       });
 
-      // Validate timestamp
       const logTimestamp = new Date(timestamp);
       if (isNaN(logTimestamp.getTime())) {
         logError(`Invalid gossip timestamp: ${timestamp}`);
@@ -179,7 +165,7 @@ export default function createSimulationRouter(
         return;
       }
 
-      // Save to database
+     
       await prisma.validatorLog.create({
         data: {
           validatorId: validatorId,
@@ -199,7 +185,7 @@ export default function createSimulationRouter(
 
   SimulationRouter.post("/start", async (_req: Request, res: Response) => {
     if (process.env.IS_AGGREGATOR === "true") {
-      // Aggregator should only coordinate validators
+      
       await Promise.all(
         peerAddresses.map(async (peer) => {
           try {
@@ -212,7 +198,7 @@ export default function createSimulationRouter(
       );
       res.json({ success: true, message: "Start command sent to all validators" });
     } else {
-      // Validators should start their validation loop
+      
     startValidationLoop();
     res.json({ success: true, message: "Validation loop started" });
     }
@@ -220,7 +206,7 @@ export default function createSimulationRouter(
 
   SimulationRouter.post("/stop", async (_req: Request, res: Response) => {
     if (process.env.IS_AGGREGATOR === "true") {
-      // Aggregator should only stop validators
+      
       await Promise.all(
         peerAddresses.map(async (peer) => {
           try {
@@ -233,7 +219,7 @@ export default function createSimulationRouter(
       );
       res.json({ success: true, message: "Stop command sent to all validators" });
     } else {
-      // Validators should stop their validation loop
+      
     stopValidationLoop();
     res.json({ success: true, message: "Validation loop stopped" });
     }
@@ -241,7 +227,7 @@ export default function createSimulationRouter(
 
   SimulationRouter.get("/", async (_req: Request, res: Response, next) => {
     try {
-      // Only validators should run validation
+      
       if (process.env.IS_AGGREGATOR !== "true") {
       startValidationLoop();
       }
@@ -268,7 +254,7 @@ async function executeRoundForUrl(
   votes: Array<{ validatorId: number; status: Status; weight: number }>;
   timestamp: string;
 }> {
-  // Skip execution for aggregator
+  
   if (process.env.IS_AGGREGATOR === "true") {
     return {
       url,
@@ -287,7 +273,7 @@ async function executeRoundForUrl(
 
     info(`[Ping] Validator ${localValidatorId}@${localLocation} → ${url}: ${voteResult.vote.status} (${voteResult.latency}ms)`);
 
-    // ✅ Only observe valid numbers
+    
     if (typeof voteResult.latency === "number" && !isNaN(voteResult.latency)) {
       latencyHistogram.observe(voteResult.latency);
     }
@@ -332,7 +318,7 @@ async function executeRoundForUrl(
   };
 
   try {
-    // Only propose to Raft if IS_AGGREGATOR is true and raftNode exists
+    
     if (typeof raftNode !== 'undefined' && process.env.IS_AGGREGATOR === "true") {
     raftNode.propose(payload);
     info(`Raft propose successful for ${url}`);

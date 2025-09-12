@@ -75,7 +75,7 @@ const ClientDashboard: React.FC = () => {
     try {
       // fetch list
       const listRes = await fetch('/api/websites', {
-        headers: { Authorization: `Bearer REDACTED_TOKEN` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (listRes.status === 401) {
         navigate('/login', { replace: true })
@@ -89,7 +89,7 @@ const ClientDashboard: React.FC = () => {
       const enriched = await Promise.all(
         websites.map(async (w) => {
           const sumRes = await fetch(`/api/websites/${w.id}/summary`, {
-            headers: { Authorization: `Bearer REDACTED_TOKEN` },
+            headers: { Authorization: `Bearer ${token}` },
           })
           if (!sumRes.ok) throw new Error('Failed to fetch summary')
           // pull latency from summary

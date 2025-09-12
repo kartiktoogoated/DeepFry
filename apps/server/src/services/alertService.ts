@@ -65,11 +65,11 @@ export async function startAlertService(wsServer: WebSocketServer): Promise<void
         try {
           const payload = JSON.parse(message.value!.toString());
 
-          // Handle individual validator votes
+         
           if (topic === "validator-votes" && payload.type === "vote") {
             if (payload.status !== "DOWN") return;
 
-            // look up the user's email
+               
             const siteRecord = await prisma.website.findUnique({
               where: { url: payload.url },
               select: { user: { select: { email: true } } },
@@ -162,7 +162,7 @@ export async function startAlertService(wsServer: WebSocketServer): Promise<void
               error(`Failed to send email: ${mailErr}`);
             }
 
-            // broadcast to frontend
+           
             const wsEvent = {
               type: "VALIDATOR_DOWN",
               data: {
@@ -186,11 +186,11 @@ export async function startAlertService(wsServer: WebSocketServer): Promise<void
             info(`WS broadcast: VALIDATOR_DOWN for ${payload.url} @ ${payload.location}`);
           }
           
-          // Handle consensus alerts
+         
           else if (topic === "validator-consensus" && payload.type === "consensus") {
             if (payload.consensus !== "DOWN") return;
 
-            // look up the user's email
+           
             const siteRecord = await prisma.website.findUnique({
               where: { url: payload.url },
               select: { user: { select: { email: true } } },
@@ -267,7 +267,7 @@ export async function startAlertService(wsServer: WebSocketServer): Promise<void
               error(`Failed to send consensus email: ${mailErr}`);
             }
 
-            // broadcast to frontend
+           
             const wsEvent = {
               type: "CRITICAL_CONSENSUS_DOWN",
               data: {
@@ -290,11 +290,11 @@ export async function startAlertService(wsServer: WebSocketServer): Promise<void
     });
   } catch (err: any) {
     error(`Failed to start alert service: ${err.stack || err}`);
-    // Don't throw - allow the service to continue without alerts
+   
   }
 }
 
-// If run standalone...
+
 if (require.main === module) {
   error("Please import startAlertService(wsServer) from your main server entrypoint.");
   process.exit(1);

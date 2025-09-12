@@ -128,9 +128,11 @@ const Footer = () => {
         </div>
 
         <div className="border-t mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} DeepFry. All rights reserved.
-          </p>
+          <div className="flex flex-col items-start gap-1">
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} DeepFry. All rights reserved.
+            </p>
+          </div>
           <div className="flex gap-6 text-sm">
             <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
               Terms

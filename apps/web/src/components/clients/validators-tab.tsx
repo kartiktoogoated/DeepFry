@@ -19,14 +19,12 @@ interface ValidatorMeta {
 
 export default function ValidatorsTab({ siteId }: { siteId: number }) {
   const [metaList, setMetaList] = useState<ValidatorMeta[]>([])
-  const token = localStorage.getItem('token')
 
   useEffect(() => {
     (async () => {
-      if (!token) return
       // history → unique IDs
       const hr = await fetch(`/api/websites/${siteId}/history?limit=100`, {
-        headers: { Authorization: `Bearer REDACTED_TOKEN` }
+        credentials: 'include',
       })
       if (!hr.ok) return
       const { logs } = await hr.json() as { logs: Array<{ validatorId: number }> }
@@ -35,7 +33,7 @@ export default function ValidatorsTab({ siteId }: { siteId: number }) {
       // fetch meta for each
       const metas = await Promise.all(ids.map(async id => {
         const r = await fetch(`/api/validators/${id}/meta`, {
-          headers: { Authorization: `Bearer REDACTED_TOKEN` }
+          credentials: 'include',
         })
         return r.ok ? await r.json() as ValidatorMeta : null
       }))

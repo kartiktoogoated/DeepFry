@@ -24,7 +24,7 @@ export default function LiveConsensusStatus({ compact, monitoredUrls }: LiveCons
 
   // Fetch initial consensus from REST API
   useEffect(() => {
-    fetch("/api/consensus")
+    fetch("/api/consensus", { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.consensus) {

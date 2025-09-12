@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from 'react'
 import { Routes, Route } from 'react-router-dom'
@@ -57,8 +58,7 @@ const ValidatorDashboard: React.FC = () => {
   })
 
   // Use environment variables for backend URLs
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-  const AGGREGATOR_BASE_URL = import.meta.env.VITE_AGGREGATOR_BASE_URL || '';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.deepfry.tech';
 
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     uptime: 0,
@@ -88,8 +88,10 @@ const ValidatorDashboard: React.FC = () => {
 
     cleanup() // Clean up any existing connections
 
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${AGGREGATOR_BASE_URL.split('//')[1]}/api/ws`)
+    // Use env or fallback to window.location.host
+    const host = import.meta.env.VITE_AGGREGATOR_BASE_URL?.replace(/^https?:\/\//, '') || window.location.host;
+    const proto = host.includes('localhost') ? 'ws' : 'wss';
+    const ws = new WebSocket(`${proto}://${host}/api/ws`);
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -124,22 +126,20 @@ const ValidatorDashboard: React.FC = () => {
             location: string;
           }>;
           timestamp: string;
-          metrics: {
+          metrics?: {
             upCount: number;
             totalCount: number;
             avgLatency: number;
             uptime: number;
           };
         };
-
-        // Update metrics
+        // Add null checks for metrics
+        const metrics = data.metrics || { upCount: 0, totalCount: 0, avgLatency: 0, uptime: 0 };
         setMetrics(prev => ({
-          uptime: data.metrics.uptime,
-          avgLatency: data.metrics.avgLatency,
+          uptime: metrics.uptime,
+          avgLatency: metrics.avgLatency,
           totalPings: prev.totalPings + 1
         }));
-
-        // Update recent logs
         setRecentLogs(prev => {
           const newLog = {
             id: Date.now(),
@@ -147,14 +147,12 @@ const ValidatorDashboard: React.FC = () => {
             region: data.votes[0]?.location || 'unknown',
             site: data.url,
             status: data.consensus,
-            latency: data.metrics.avgLatency,
+            latency: data.votes[0]?.latencyMs ?? null,
             timestamp: data.timestamp,
             location: data.votes[0]?.location || 'unknown'
           };
-          return [newLog, ...prev].slice(0, 100); // Keep last 100 logs
+          return [newLog, ...prev].slice(0, 100);
         });
-
-        // If logs exist, set isStarted true
         if (!isStarted) setIsStarted(true)
       } catch (err) {
         console.error('Failed to parse WebSocket message', err)
@@ -194,10 +192,14 @@ const ValidatorDashboard: React.FC = () => {
         return true;
       });
 
-      const sorted = uniqueLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      // Map latency: only show if positive number, else null
+      const mappedLogs = uniqueLogs.map(log => ({
+        ...log,
+        latency: typeof log.latency === 'number' && log.latency > 0 ? log.latency : null,
+      }));
+
+      const sorted = mappedLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       const count = sorted.length
-      const upCount = sorted.filter((l) => l.status === 'UP').length
-      const uptime = count ? Math.round((upCount / count) * 100) : 0
       const lastPing = sorted[0]?.timestamp || ''
 
       // Calculate performance score from recent logs (last 10)
@@ -205,10 +207,15 @@ const ValidatorDashboard: React.FC = () => {
       const recentUpCount = recentLogs.filter((l) => l.status === 'UP').length
       const performanceScore = recentLogs.length ? Math.round((recentUpCount / recentLogs.length) * 100) : 0
       
+      // Calculate uptime from recent logs (last 100)
+      const recentLogsForUptime = sorted.slice(0, 100);
+      const upCountForUptime = recentLogsForUptime.filter((l) => l.status === 'UP').length;
+      const uptimeFromRecentLogs = recentLogsForUptime.length ? Math.round((upCountForUptime / recentLogsForUptime.length) * 100) : 0;
+      
       setDashboardData((prev) => ({
         ...prev,
         pingCount: count,
-        uptime,
+        uptime: uptimeFromRecentLogs,
         lastPing,
         performanceScore,
       }))
@@ -286,8 +293,13 @@ const ValidatorDashboard: React.FC = () => {
   useEffect(() => {
     const toggleValidatorOnBackend = async () => {
       try {
-        const path = isStarted ? `${AGGREGATOR_BASE_URL}/api/simulate/start` : `${AGGREGATOR_BASE_URL}/api/simulate/stop`;
-        const res = await fetch(path, { 
+        // Ensure AGGREGATOR_BASE_URL does not have protocol or trailing slash
+        const host = import.meta.env.VITE_AGGREGATOR_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '') || window.location.host;
+        const proto = host.includes('localhost') ? 'http' : 'https';
+        const path = isStarted
+          ? `${proto}://${host}/api/simulate/start`
+          : `${proto}://${host}/api/simulate/stop`;
+        const res = await fetch(path, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

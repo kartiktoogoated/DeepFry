@@ -82,7 +82,6 @@ export class RaftNode {
   private validateAndFormatPeers(peers: string[]): string[] {
     return peers.map(peer => {
       try {
-        // Ensure peer has http:// prefix
         const url = peer.startsWith('http') ? peer : `http://${peer}`;
         new URL(url); // Validate URL format
         return url;
@@ -90,12 +89,12 @@ export class RaftNode {
         warn(`Invalid peer URL ${peer}, skipping`);
         return '';
       }
-    }).filter(Boolean); // Remove empty strings
+    }).filter(Boolean); 
   }
 
-  // ————— Election timeout / heartbeat —————
 
-  /** Election timeout between 5 and 10 seconds */
+
+  
   private resetElectionTimeout() {
     clearTimeout(this.electionTimeout!);
     const timeout = 5000 + Math.random() * 5000;
@@ -103,7 +102,7 @@ export class RaftNode {
     this.electionTimeout = setTimeout(() => this.startElection(), timeout);
   }
 
-  /** Heartbeats every 1 second */
+  
   private startHeartbeat() {
     clearInterval(this.heartbeatInterval!);
     info(`Node ${this.id} starting heartbeat interval (1000ms)`);
@@ -115,7 +114,7 @@ export class RaftNode {
     );
   }
 
-  // ————— Candidate / election —————
+  
 
   private async startElection() {
     this.state = "Candidate";
@@ -197,7 +196,7 @@ export class RaftNode {
     this.resetElectionTimeout();
   }
 
-  // ————— RPC handlers —————
+  
 
   public async handleRequestVote(
     rpc: RequestVoteRPC
@@ -234,7 +233,7 @@ export class RaftNode {
     }
     this.becomeFollower(rpc.term);
 
-    // Sample heartbeat logs (only once per second)
+    
     if (rpc.entries.length === 0) {
       const now = Date.now();
       if (now - this.lastHeartbeatLog > 1000) {
@@ -249,13 +248,13 @@ export class RaftNode {
       );
     }
 
-    // Consistency check
+    
     const prev = this.log[rpc.prevLogIndex];
     if (rpc.prevLogIndex >= 0 && (!prev || prev.term !== rpc.prevLogTerm)) {
       return { term: this.currentTerm, success: false };
     }
 
-    // Append any new entries
+    
     let idx = rpc.prevLogIndex + 1;
     for (const entry of rpc.entries) {
       if (this.log[idx]?.term !== entry.term) {
@@ -265,7 +264,7 @@ export class RaftNode {
       idx++;
     }
 
-    // Advance commitIndex
+    
     if (rpc.leaderCommit > this.commitIndex) {
       this.commitIndex = Math.min(rpc.leaderCommit, this.log.length - 1);
       while (this.lastApplied < this.commitIndex) {
@@ -277,7 +276,7 @@ export class RaftNode {
     return { term: this.currentTerm, success: true };
   }
 
-  // ————— broadcast heartbeats & entries —————
+  
 
   public async broadcastAppendEntries(entries: LogEntry[]): Promise<void> {
     if (this.state !== "Leader") {
@@ -305,7 +304,7 @@ export class RaftNode {
           );
   
           if (!res.data.success) {
-            // if follower is behind or term is stale
+           
             if (res.data.term > this.currentTerm) {
               this.becomeFollower(res.data.term);
             }
@@ -316,7 +315,7 @@ export class RaftNode {
             return;
           }
   
-          // only update indexes & log when actually replicating entries
+         
           if (entries.length > 0) {
             this.matchIndex[i] = prevIndex + entries.length;
             this.nextIndex[i] = this.matchIndex[i] + 1;
@@ -324,7 +323,7 @@ export class RaftNode {
               `Node ${this.id} replicated to ${peer}: matchIndex=${this.matchIndex[i]}`
             );
   
-            // try to advance commitIndex on majority
+           
             for (let N = this.log.length - 1; N > this.commitIndex; N--) {
               const count = [this.id, ...this.peers.map((_, j) => j)]
                 .filter((j) => this.matchIndex[j] >= N).length;
@@ -353,7 +352,7 @@ export class RaftNode {
     );
   }
   
-  // ————— client proposals —————
+  
 
   public propose(command: any) {
     if (this.state !== "Leader") {

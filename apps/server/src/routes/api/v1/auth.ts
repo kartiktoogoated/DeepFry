@@ -10,15 +10,15 @@ import prisma from '../../../prismaClient';
 const authRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET!;
 
-// Rate limiter for all auth routes
+
 authRouter.use(authRateLimiter);
 
-// Email/OTP-based auth
+
 authRouter.post('/signup', signup);
 authRouter.post('/verify-otp', verifyPendingSignup);
 authRouter.post('/signin', signin);
 
-// Solana wallet verification
+
 authRouter.post('/verify-wallet', async (req: Request, res: Response): Promise<void> => {
     try {
         const { wallet, message, signature } = req.body as {
@@ -65,7 +65,7 @@ authRouter.post('/verify-wallet', async (req: Request, res: Response): Promise<v
     }
 });
 
-// Google Oauth routes.
+ 
 
 authRouter.get(
     '/google',
@@ -88,7 +88,7 @@ authRouter.get(
                     JWT_SECRET,
                     { expiresIn: "1h" }
                 );
-                // Redirect to frontend with token and user info as query params
+
                 return res.redirect(
                   `https://www.deepfry.tech/oauth-success?token=${token}` +
                   (name ? `&name=${encodeURIComponent(name)}` : '') +

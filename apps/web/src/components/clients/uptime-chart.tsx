@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LineChart,
   Line,
@@ -33,12 +33,12 @@ interface UptimeChartProps {
 
 export default function UptimeChart({ siteId, siteUrl }: UptimeChartProps) {
   const [data, setData] = useState<DayData[]>([])
-  const token = useMemo(() => localStorage.getItem('token')!, [])
+  // const token = useMemo(() => localStorage.getItem('token')!, [])
 
   useEffect(() => {
     const fetchHistory = async () => {
       const res = await fetch(`/api/websites/${siteId}/history?limit=1000`, {
-        headers: { Authorization: `Bearer REDACTED_TOKEN` },
+        credentials: 'include',
       })
       if (!res.ok) return
       const json = await res.json()

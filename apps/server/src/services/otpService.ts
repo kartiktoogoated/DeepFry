@@ -40,7 +40,7 @@ async function runConsumer() {
       try {
         const { email, otp } = JSON.parse(message.value!.toString());
         if (!email || !otp) throw new Error('Missing email or OTP in message');
-        console.log(`📨 Sending OTP to ${email}`);
+        console.log(`Sending OTP to ${email}`);
         await sendOTPEmail(email, otp);
       } catch (err) {
         console.error('❌ Failed to handle message:', err);

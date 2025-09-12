@@ -17,7 +17,6 @@ const jsonParser = express.json();
 export function initRaftRouter(node: RaftNode): Router {
   const router = Router();
 
-  // promise-wrapped JSON parser
   router.use((req: Request, res: Response, next: NextFunction): Promise<any> => {
     return new Promise<any>((resolve, reject) => {
       jsonParser(req, res, (err) => (err ? reject(err) : resolve(undefined)));
@@ -26,29 +25,26 @@ export function initRaftRouter(node: RaftNode): Router {
       .catch(next);
   });
 
-  // RPC for election votes
   router.post(
     "/request-vote",
     async (req: Request, res: Response<RequestVoteResult>): Promise<any> => {
-      console.log("📨 RequestVote received:", req.body);
+      console.log("RequestVote received:", req.body);
       const rpc = req.body as RequestVoteRPC;
       const result = await node.handleRequestVote(rpc);
       return res.json(result);
     }
   );
 
-  // RPC for heartbeats & log replication
   router.post(
     "/append-entries",
     async (req: Request, res: Response<AppendEntriesResult>): Promise<any> => {
-      console.log("📨 RequestVote received:", req.body);
+      console.log("RequestVote received:", req.body);
       const rpc = req.body as AppendEntriesRPC;
       const result = await node.handleAppendEntries(rpc);
       return res.json(result);
     }
   );
 
-  // Introspection: cluster/node status
   router.get("/status", async (_req, res: Response): Promise<any> => {
     return res.json({
       id:          node.id,
@@ -61,7 +57,6 @@ export function initRaftRouter(node: RaftNode): Router {
     });
   });
 
-  // Introspection: in-memory log entries
   router.get("/log", async (_req, res: Response): Promise<any> => {
     return res.json(node.log);
   });

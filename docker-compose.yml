@@ -26,7 +26,7 @@ services:
     container_name: postgres-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: REDACTED_PASSWORD
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: mydb
     ports:
       - "5432:5432"
@@ -105,10 +105,10 @@ services:
       sh -c "
         echo '🕒 Waiting for DB...' &&
         until nc -z db 5432; do sleep 1; done &&
-        echo '✅ DB ready, running migrations...' &&
+        echo 'DB ready, running migrations...' &&
         cd /app/packages/db &&
         npx prisma migrate deploy &&
-        echo '🚀 Starting API Server...' &&
+        echo 'Starting API Server...' &&
         node /app/apps/server/dist/src/services/api-server/api-server.js
       "
 
@@ -129,14 +129,14 @@ services:
       - NET_RAW
     command: >
       sh -c "
-        echo '🕒 Waiting for DB...' &&
+        echo 'Waiting for DB...' &&
         until nc -z db 5432; do sleep 1; done &&
-        echo '🕒 Waiting for Aggregator...' &&
+        echo 'Waiting for Aggregator...' &&
         until curl -s http://aggregator:3000/health > /dev/null; do sleep 1; done &&
-        echo '✅ All services ready, running migrations...' &&
+        echo 'All services ready, running migrations...' &&
         cd /app/packages/db &&
         npx prisma migrate deploy &&
-        echo '🚀 Starting Validator 1...' &&
+        echo 'Starting Validator 1...' &&
         node /app/apps/server/dist/src/services/validator/server.js
       "
 

@@ -16,6 +16,7 @@ const LoginPage = lazy(() => import('@/pages/login'));
 const SignupPage = lazy(() => import('@/pages/signup'));
 const PricingPage = lazy(() => import('./pages/pricing'));
 const ValidatorDashboard = lazy(() => import('./pages/validator-dashboard'));
+const HowItWorksPage = lazy(() => import('./pages/how-it-works'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -65,6 +66,11 @@ function App() {
                 <PricingPage />
               </Suspense>
             } />
+            <Route path="/how-it-works" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <HowItWorksPage />
+              </Suspense>
+            } />
             <Route path="/validator-dashboard/*" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <ValidatorDashboard />
@@ -77,8 +83,8 @@ function App() {
             } />
             <Route path="/oauth-success" element={<OauthSuccess />} />
           </Routes>
-          <Toaster />
         </AuthProvider>
+        <Toaster />
       </ThemeProvider>
     </BrowserRouter>
   );

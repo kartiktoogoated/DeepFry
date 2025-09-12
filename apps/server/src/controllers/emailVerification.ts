@@ -9,8 +9,7 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
       res.status(400).json({ message: "Email and OTP are required" });
       return;
     }
-
-    // Find the user by email.
+    
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       res.status(400).json({ message: "Invalid email" });
@@ -21,8 +20,7 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Instead of updating otp and otpExpires (which no longer exist),
-    // simply mark the user as verified.
+    
     await prisma.user.update({
       where: { email },
       data: {

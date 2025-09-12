@@ -1,9 +1,7 @@
-// src/metrics.ts
-import client from 'prom-client';
+import client from "prom-client";
 
 export const register = new client.Registry();
 
-// Histogram for raw ping latencies
 export const latencyHistogram = new client.Histogram({
   name: 'ping_latency_ms',
   help: 'Latency of each ping in milliseconds',
@@ -11,7 +9,6 @@ export const latencyHistogram = new client.Histogram({
 });
 register.registerMetric(latencyHistogram);
 
-// Counter for up/down status
 export const statusCounter = new client.Counter({
   name: 'ping_status_total',
   help: 'Count of ping statuses by result',
@@ -19,7 +16,6 @@ export const statusCounter = new client.Counter({
 });
 register.registerMetric(statusCounter);
 
-// Validator metrics
 export const validatorSimulationsGauge = new client.Gauge({
   name: 'validator_active_simulations',
   help: 'Number of active simulations per validator',
@@ -34,7 +30,6 @@ export const validatorUptimeGauge = new client.Gauge({
 });
 register.registerMetric(validatorUptimeGauge);
 
-// Aggregator metrics
 export const aggregatorValidatorsGauge = new client.Gauge({
   name: 'aggregator_active_validators',
   help: 'Number of active validators connected to aggregator',
@@ -47,7 +42,6 @@ export const aggregatorUptimeGauge = new client.Gauge({
 });
 register.registerMetric(aggregatorUptimeGauge);
 
-// Kafka metrics
 export const kafkaMessageCounter = new client.Counter({
   name: 'kafka_messages_total',
   help: 'Total number of Kafka messages processed',
@@ -55,7 +49,6 @@ export const kafkaMessageCounter = new client.Counter({
 });
 register.registerMetric(kafkaMessageCounter);
 
-// WebSocket metrics
 export const websocketConnectionsGauge = new client.Gauge({
   name: 'websocket_connections',
   help: 'Number of active WebSocket connections',
@@ -63,10 +56,8 @@ export const websocketConnectionsGauge = new client.Gauge({
 });
 register.registerMetric(websocketConnectionsGauge);
 
-// Add some default metrics (CPU / memory / event loop lag, etc)
 client.collectDefaultMetrics({ register });
 
-// Export metrics for use in services
 export const metrics = {
   register,
   latencyHistogram,

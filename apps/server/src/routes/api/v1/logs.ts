@@ -6,7 +6,7 @@ export default function createLogsRouter(): Router {
 
   router.get("/", async (_req: Request, res: Response) => {
     try {
-      // Fetch *all* logs, newest first
+      
       const logs = await prisma.validatorLog.findMany({
         include: {
           validator: {

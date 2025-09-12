@@ -47,9 +47,7 @@ const SitesList = ({ sites, onSelect, selectedSite, onDelete }: SitesListProps) 
     try {
       const res = await fetch(`/api/websites/${siteToDelete}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+        credentials: 'include',
       })
 
       if (!res.ok) {

@@ -27,7 +27,7 @@ export class GossipManager {
   ): Promise<void> {
     for (let round = 1; round <= this.rounds; round++) {
       info(`Starting gossip round ${round} for ${siteUrl}`);
-      // each validator gossips with the full payload
+      
       await Promise.all(
         this.validators.map((validator) =>
           validator.gossip(

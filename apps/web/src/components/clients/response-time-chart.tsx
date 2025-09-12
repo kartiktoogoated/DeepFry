@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   AreaChart,
   Area,
@@ -17,6 +17,7 @@ interface HistoryLog {
   timestamp: string
   status: 'UP' | 'DOWN'
   url: string
+  validatorId?: number
 }
 
 interface MinuteBucket {
@@ -89,7 +90,7 @@ interface Props {
 export default function ResponseTimeChart({ siteId, siteUrl }: Props) {
   const [data, setData] = useState<MinuteBucket[]>([])
   const wsRef = useRef<WebSocket | null>(null)
-  const token = useMemo(() => localStorage.getItem('token')!, [])
+  // const token = useMemo(() => localStorage.getItem('token')!, [])
 
   async function loadHistory() {
     const now = Date.now()
@@ -111,7 +112,7 @@ export default function ResponseTimeChart({ siteId, siteUrl }: Props) {
 
     const res = await fetch(
       `/api/websites/${siteId}/history?limit=60`,
-      { headers: { Authorization: `Bearer REDACTED_TOKEN` } }
+      { credentials: 'include' }
     )
     if (!res.ok) return
     const json = await res.json() as { logs: HistoryLog[] }
@@ -119,12 +120,18 @@ export default function ResponseTimeChart({ siteId, siteUrl }: Props) {
     historyCacheTime[siteId] = now
 
     const slice = json.logs
+      .filter(log =>
+        log.status === 'UP' &&
+        typeof log.latency === 'number' &&
+        log.latency > 0 &&
+        log.validatorId !== 0
+      )
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .slice(-60)
       .map(log => ({
         formattedTime: formatLabel(log.timestamp),
-        latency: log.status === 'UP' ? log.latency : null,
-        isDown: log.status === 'DOWN',
+        latency: log.latency,
+        isDown: false,
       }))
     setData(slice)
   }

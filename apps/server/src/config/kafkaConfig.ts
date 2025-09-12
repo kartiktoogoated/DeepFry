@@ -1,4 +1,4 @@
-// src/config/kafkaConfig.ts
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -9,10 +9,14 @@ const envSchema = z.object({
     .string()
     .nonempty()
     .describe("Comma-separated list of Kafka brokers"),
-  KAFKA_CLIENT_ID: z
+  KAFKA_TOPIC: z
     .string()
-    .default("validator-sim")
-    .describe("Kafka clientId"),
+    .default("validator-logs")
+    .describe("Kafka topic for validator logs"),
+  KAFKA_CONSENSUS_TOPIC: z
+    .string()
+    .default("validator-consensus")
+    .describe("Kafka topic for consensus results"),
 });
 
 export type KafkaConfig = z.infer<typeof envSchema>;

@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  // 1) Fetch detailed logs, including the validator’s location
+ 
   const logs = await prisma.validatorLog.findMany({
     include: {
       validator: {
@@ -12,7 +12,7 @@ async function main(): Promise<void> {
     orderBy: { timestamp: "desc" },
   });
 
-  console.log("\n📋 Detailed Validator Logs:");
+  console.log("\nDetailed Validator Logs:");
   console.table(
     logs.map((l) => ({
       id:           l.id,
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     }))
   );
 
-  // 2) Summarize by validator
+  
   const byValidator = logs.reduce<Record<number, { validatorId: number; region: string; up: number; down: number }>>((acc, l) => {
     const key = l.validatorId;
     if (!acc[key]) {
@@ -35,10 +35,10 @@ async function main(): Promise<void> {
     return acc;
   }, {});
 
-  console.log("\n📊 Summary by Validator:");
+  console.log("\nSummary by Validator:");
   console.table(Object.values(byValidator));
 
-  // 3) Summarize by region
+
   const byRegion = logs.reduce<Record<string, { region: string; up: number; down: number }>>((acc, l) => {
     const loc = l.validator.location;
     if (!acc[loc]) {
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     return acc;
   }, {});
 
-  console.log("\n🌐 Summary by Region:");
+  console.log("\nSummary by Region:");
   console.table(Object.values(byRegion));
 
   await prisma.$disconnect();

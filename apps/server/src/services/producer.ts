@@ -2,7 +2,7 @@ import { Kafka, logLevel } from "kafkajs";
 import { info, warn, error as logError } from "../../utils/logger";
 import { kafkaBrokerList, kafkaConfig } from "../config/kafkaConfig";
 
-// Payload types
+
 export interface LogEntry {
   validatorId: number;
   url: string;
@@ -22,7 +22,7 @@ export interface OtpRequest {
   verificationLink?: string;
 }
 
-// Kafka client and producer setup
+
 const kafka = new Kafka({
   clientId: process.env.IS_AGGREGATOR === 'true' ? 'aggregator' : 'validator',
   brokers: (process.env.KAFKA_BOOTSTRAP_SERVERS || 'kafka:9092').split(','),
@@ -54,7 +54,7 @@ export async function sendToTopic(topic: string, message: any) {
   });
 }
 
-// ——— Publish a health check log, and optionally enqueue an alert ——
+
 export async function publishHealthCheck(
   entry: LogEntry,
   alertUserId?: number
@@ -73,7 +73,7 @@ export async function publishHealthCheck(
   }
 }
 
-// ——— Publish an OTP request to be consumed by your OTP service ———
+
 export async function publishOtpRequest(request: OtpRequest): Promise<void> {
   try {
     await sendToTopic("otp-requests", request);

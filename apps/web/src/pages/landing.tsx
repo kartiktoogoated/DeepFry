@@ -33,38 +33,38 @@ const LandingPage = () => {
     document.title = 'DeepFry - Distributed Validator Network';
   }, []);
 
-  const faqs = [
-    {
-      question: "What is a distributed validator network?",
-      answer: "A distributed validator network is a decentralized system where multiple nodes work together to monitor website uptime and performance. Our network uses consensus mechanisms to ensure reliable and accurate monitoring results."
-    },
-    {
-      question: "How do I become a validator?",
-      answer: "To become a validator, you'll need to meet our minimum system requirements and stake tokens. The process involves setting up a validator node, completing verification, and joining our consensus network. Full details will be available when our validator program launches."
-    },
-    {
-      question: "What are the rewards for validators?",
-      answer: "Validators earn rewards in DeepFry tokens based on their performance, uptime, and participation in consensus. The exact reward structure will be announced with our tokenomics release."
-    },
-    {
-      question: "How does website monitoring work?",
-      answer: "Our network uses distributed validators to monitor websites from multiple geographic locations. Validators check uptime, response time, and other metrics, reaching consensus to provide accurate, tamper-proof monitoring data."
-    },
-    {
-      question: "What makes DeepFry different from traditional monitoring?",
-      answer: "Unlike centralized monitoring services, DeepFry uses a decentralized network of validators to provide trustless, consensus-based monitoring. This ensures higher reliability, transparency, and resistance to single points of failure."
-    }
-  ];
-
   const sectionVariants = {
     hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } },
   };
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
   };
+
+  const faqs = [
+    {
+      question: "What is DeepFry?",
+      answer: "DeepFry is a decentralized website monitoring network that leverages a global network of distributed validators to provide reliable and accurate uptime and performance monitoring. Our consensus-driven approach ensures data integrity and eliminates single points of failure."
+    },
+    {
+      question: "How does DeepFry ensure data accuracy?",
+      answer: "DeepFry uses a robust consensus mechanism, including Raft consensus and Gossip protocol, to ensure that all validators agree on the website monitoring results. This distributed consensus eliminates malicious actors and ensures high data accuracy and reliability."
+    },
+    {
+      question: "How can I earn crypto with DeepFry?",
+      answer: "You can earn crypto by running a validator node and participating in our network's consensus. Validators are rewarded with DeepFry tokens for their uptime, performance, and contribution to the network's security and data verification."
+    },
+    {
+      question: "What are the technical requirements to run a validator node?",
+      answer: "Running a validator node requires a stable internet connection, a certain amount of stake in DeepFry tokens, and a machine that meets our minimum hardware specifications. Detailed requirements and setup guides are available in our documentation."
+    },
+    {
+      question: "Is DeepFry suitable for large-scale enterprise monitoring?",
+      answer: "Yes, DeepFry's decentralized and scalable architecture makes it ideal for enterprise-grade website monitoring. It offers enhanced reliability, global coverage, and verifiable data, providing a robust solution for businesses of all sizes."
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -93,7 +93,7 @@ const LandingPage = () => {
                 <Link to="/login">Get Started <ChevronRight size={16} className="ml-2" /></Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link to="#learn-more">Learn More</Link>
+                <Link to="/how-it-works">How It Works</Link>
               </Button>
             </motion.div>
           </div>

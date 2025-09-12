@@ -7,7 +7,7 @@ import {
 
 const websiteRouter = Router();
 
-// Post /api/websites - Add new website for monitoring
+
 websiteRouter.post(
   "/websites",
   authMiddleware,
@@ -46,7 +46,7 @@ websiteRouter.post(
   }
 );
 
-// GET /api/websites - list
+
 websiteRouter.get(
   "/websites",
   authMiddleware,
@@ -70,7 +70,7 @@ websiteRouter.get(
   }
 );
 
-// PUT /api/websites/:id
+
 websiteRouter.put(
   "/websites/:id",
   authMiddleware,
@@ -104,7 +104,7 @@ websiteRouter.put(
   }
 );
 
-// DELETE /api/websites/:id
+
 websiteRouter.delete(
   "/websites/:id",
   authMiddleware,
@@ -132,7 +132,7 @@ websiteRouter.delete(
   }
 );
 
-// GET /api/websites/:id/history
+
 websiteRouter.get(
   "/websites/:id/history",
   authMiddleware,
@@ -148,7 +148,7 @@ websiteRouter.get(
     const skip = (page - 1) * limit;
 
     try {
-      // ownership check
+        
       const website = await prisma.website.findUnique({ where: { id } });
       if (!website || website.userId !== user.id) {
         return res
@@ -182,7 +182,7 @@ websiteRouter.get(
   }
 );
 
-// PUT /api/websites/:id/pause
+
 websiteRouter.put(
   "/websites/:id/pause",
   authMiddleware,
@@ -221,7 +221,7 @@ websiteRouter.put(
   }
 );
 
-// GET /api/websites/:id/summary
+
 websiteRouter.get(
   "/websites/:id/summary",
   authMiddleware,
@@ -267,7 +267,7 @@ websiteRouter.get(
   }
 );
 
-// GET /api/validators/:id/meta
+
 websiteRouter.get(
   "/validators/:id/meta",
   async (req: Request, res: Response): Promise<any> => {

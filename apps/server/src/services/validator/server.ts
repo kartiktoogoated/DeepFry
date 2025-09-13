@@ -9,7 +9,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { Validator } from "../../core/Validator";
-import { info, error as logError } from "../../../utils/logger";
+import { info, error as logError, warn } from "../../../utils/logger";
 import { register as promRegister } from "../../metrics";
 import createSimulationRouter from "../../routes/api/v1/simulation";
 import { WebSocketServer } from "ws";
@@ -48,29 +48,43 @@ const validator = new Validator(validatorId, location);
 const siteChecks: Record<string, any> = {};
 
 async function checkAllWebsites() {
-  const websites = await prisma.website.findMany();
-  for (const site of websites) {
-    try {
-      const { vote, latency } = await validator.checkWebsite(site.url);
+  try {
+    const websites = await prisma.website.findMany({
+      where: { paused: false },
+    });
 
-      siteChecks[site.id] = {
-        siteId: site.id,
-        url: site.url,
-        lastCheck: { vote, latency, timestamp: new Date().toISOString() },
-      };
-
-      info(
-        `Validator ${validatorId}@${location} → ${site.url}: ${vote.status} (${latency}ms)`
-      );
-    } catch (error) {
-      logError(
-        `Validator ${validatorId} failed for ${site.url}: ${error}`
-      );
+    if (websites.length === 0) {
+      warn(`Validator ${validatorId}@${location}: no websites to check`);
+      return;
     }
+
+    for (const site of websites) {
+      try {
+        const { vote, latency } = await validator.checkWebsite(site.url);
+
+        siteChecks[site.id] = {
+          siteId: site.id,
+          url: site.url,
+          lastCheck: {
+            vote,
+            latency,
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        info(
+          `Validator ${validatorId}@${location} → ${site.url}: ${vote.status} (${latency}ms)`
+        );
+      } catch (err) {
+        logError(`Validator ${validatorId} failed for ${site.url}: ${err}`);
+      }
+    }
+  } catch (err) {
+    logError(`DB fetch failed for validator ${validatorId}: ${err}`);
   }
 }
 
-checkAllWebsites();
+setTimeout(checkAllWebsites, 2000);
 
 setInterval(checkAllWebsites, pingInterval);
 

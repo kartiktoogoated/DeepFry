@@ -1,133 +1,62 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-if (process.env.IS_AGGREGATOR !== "true") {
-  throw new Error("Run this file with IS_AGGREGATOR=true");
+import express, { Request, Response } from "express";
+import http from "http";
+import { WebSocketServer, WebSocket } from "ws";
+import nodemailer from "nodemailer";
+import { Counter, Gauge, Histogram } from "prom-client";
+
+import prisma from "../../prismaClient"; 
+import { info, error as logError } from "../../utils/logger"; 
+import { sendToTopic } from "../../services/producer"; 
+import { mailConfig } from "../../config/mailConfig"; 
+
+
+const SERVER_PORT = Number(process.env.PORT) || 3000;
+
+if (!process.env.VALIDATOR_IDS) {
+  throw new Error("VALIDATOR_IDS must be set (comma-separated)");
 }
 
-import express, { Request, Response, RequestHandler } from "express";
-import http from "http";
-import { info, error as logError } from "../../utils/logger";
-import { Counter, Histogram } from "prom-client";
-import { kafkaBrokerList } from "../../config/kafkaConfig";
-import { Kafka, logLevel } from "kafkajs";
-import { WebSocketServer } from "ws";
-import fs from "fs";
-import path from "path";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
-
-const app = express();
-const PORT = Number(process.env.PORT) || 3000;
-
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
+const VALIDATOR_IDS = process.env.VALIDATOR_IDS.split(",").map((s) => {
+  const n = Number(s.trim());
+  if (isNaN(n)) {
+    throw new Error(`Invalid validator ID: ${s}`);
+  }
+  return n;
 });
 
-
-const LOGS_DIR = process.env.LOG_DIR || path.join(process.cwd(), "logs");
-if (!fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
+if (VALIDATOR_IDS.length === 0) {
+  throw new Error("VALIDATOR_IDS list cannot be empty");
 }
 
-const LOG_ROTATION_INTERVAL = 24 * 60 * 60 * 1000; 
-const MAX_LOG_SIZE = 100 * 1024 * 1024; // 100MB
-const MAX_LOGS_TO_KEEP = 7; 
+const QUORUM = Math.ceil(VALIDATOR_IDS.length / 2);
 
+const KAFKA_TOPIC = process.env.KAFKA_TOPIC || "validator-logs";
+const KAFKA_CONSENSUS_TOPIC =
+  process.env.KAFKA_CONSENSUS_TOPIC || "validator-consensus";
 
-function getCurrentLogFile() {
-  const date = new Date();
-  return path.join(
-    LOGS_DIR,
-    `validator-logs-${date.toISOString().split("T")[0]}.json`
-  );
-}
-
-
-async function writeLogToFile(logData: any) {
-  const filePath = getCurrentLogFile();
-
+let ALERT_EMAILS: Record<string, string> = {};
+if (process.env.LOCATION_EMAILS) {
   try {
-    let existingLogs = [];
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, "utf-8");
-      existingLogs = JSON.parse(fileContent);
-    }
-
-    existingLogs.push({
-      ...logData,
-      timestamp: new Date().toISOString(),
-    });
-
-    fs.writeFileSync(filePath, JSON.stringify(existingLogs, null, 2));
-
-    
-    const stats = fs.statSync(filePath);
-    if (stats.size > MAX_LOG_SIZE) {
-      await rotateLogs();
-    }
-  } catch (err: any) {
-    logError(`Failed to write log: ${err}`);
+    ALERT_EMAILS = JSON.parse(process.env.LOCATION_EMAILS);
+  } catch {
+    throw new Error("LOCATION_EMAILS must be valid JSON");
   }
 }
-
-
-async function rotateLogs() {
-  try {
-    const files = fs
-      .readdirSync(LOGS_DIR)
-      .filter((f) => f.startsWith("validator-logs-"))
-      .sort()
-      .reverse();
-
-    
-    if (files.length > 0) {
-      const oldestFile = files[files.length - 1];
-      const filePath = path.join(LOGS_DIR, oldestFile);
-
-      if (process.env.S3_BUCKET) {
-        await s3Client.send(
-          new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET,
-            Key: `${process.env.S3_PREFIX || 'logs'}/${oldestFile}`,
-            Body: fs.readFileSync(filePath),
-            ContentType: "application/json",
-          })
-        );
-        info(`Uploaded logs to S3: ${oldestFile}`);
-      }
-
-      
-      fs.unlinkSync(filePath);
-    }
-
-    
-    if (files.length > MAX_LOGS_TO_KEEP) {
-      files.slice(MAX_LOGS_TO_KEEP).forEach((file) => {
-        fs.unlinkSync(path.join(LOGS_DIR, file));
-      });
-    }
-  } catch (err: any) {
-    logError(`Failed to rotate logs: ${err}`);
-  }
-}
-
-
-setInterval(rotateLogs, LOG_ROTATION_INTERVAL);
 
 
 const voteCounter = new Counter({
   name: "validator_votes_total",
   help: "Total number of votes received",
   labelNames: ["status"],
+});
+
+const consensusGauge = new Gauge({
+  name: "site_consensus_status",
+  help: "Current consensus status for sites (1=UP, 0=DOWN)",
+  labelNames: ["url"],
 });
 
 const voteLatencyHistogram = new Histogram({
@@ -137,255 +66,255 @@ const voteLatencyHistogram = new Histogram({
 });
 
 
-const processedConsensus = new Set<string>();
-
-
-const VOTES_TOPIC = process.env.KAFKA_TOPIC || "validator-logs";
-const CONSENSUS_TOPIC = process.env.KAFKA_CONSENSUS_TOPIC || "validator-consensus";
-
-
-const kafka = new Kafka({
-  clientId: "aggregator",
-  brokers: kafkaBrokerList,
-  logLevel: logLevel.INFO,
+const mailTransporter = nodemailer.createTransport({
+  host: mailConfig.SMTP_HOST,
+  port: Number(mailConfig.SMTP_PORT),
+  secure: mailConfig.SMTP_SECURE,
+  auth: {
+    user: mailConfig.SMTP_USER,
+    pass: mailConfig.SMTP_PASS,
+  },
 });
 
-const producer = kafka.producer();
 
+type Status = "UP" | "DOWN";
 
-async function connectKafka() {
-  try {
-    await producer.connect();
-    info("Connected to Kafka");
-  } catch (err) {
-    logError(`Failed to connect to Kafka: ${err}`);
-    throw err;
-  }
+interface VoteEntry {
+  validatorId: number;
+  status: Status;
+  weight: number;
+  latencyMs: number;
+  location: string;
+  timestamp: number; // arrival time (ms)
 }
 
+const voteBuffer: Record<string, VoteEntry[]> = {};
+const processedConsensus = new Set<string>();
+const VOTE_TTL_MS = 5 * 60 * 1000; // votes older than 5 min are discarded
 
-async function processQuorum(payload: any) {
+function cleanupOldVotes() {
+  const now = Date.now();
+  for (const key of Object.keys(voteBuffer)) {
+    const arr = voteBuffer[key];
+    if (!arr?.length) {
+      delete voteBuffer[key];
+      continue;
+    }
+    voteBuffer[key] = arr.filter((e) => now - e.timestamp < VOTE_TTL_MS);
+    if (voteBuffer[key].length === 0) delete voteBuffer[key];
+  }
+}
+setInterval(cleanupOldVotes, 60_000);
+
+
+const app = express();
+app.use(express.json());
+
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok", service: "aggregator" });
+});
+
+app.get("/api/historical-logs", async (req: Request, res: Response) => {
   try {
-    const { 
-      url, 
-      timestamp, 
-      status, 
-      latencyMs, 
-      validatorId, 
-      location, 
-      icmpStatus, 
-      httpStatus, 
-      httpCode, 
-      failureReason 
-    } = payload;
-
-   
-    if (!url || !timestamp || !status || !validatorId || !location) {
-      logError(`Invalid payload received: ${JSON.stringify(payload)}`);
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      res
+        .status(400)
+        .json({ error: "startDate and endDate are required (ISO strings)" });
       return;
     }
 
-    const key = `${url}__${timestamp}`;
-
-    if (processedConsensus.has(key)) return;
-
-   
-    await producer.send({
-      topic: VOTES_TOPIC,
-      messages: [
-        {
-          key: `${url}__${validatorId}__${timestamp}`,
-          value: JSON.stringify({
-            type: "vote",
-            validatorId,
-            url,
-            status,
-            latencyMs,
-            timestamp,
-            location,
-            icmpStatus,
-            httpStatus,
-            httpCode,
-            failureReason
-          }),
+    const logs = await prisma.validatorLog.findMany({
+      where: {
+        timestamp: {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string),
         },
-      ],
+      },
+      orderBy: { timestamp: "asc" },
     });
 
-   
-    await producer.send({
-      topic: CONSENSUS_TOPIC,
-      messages: [
-        {
-          key,
-          value: JSON.stringify({
-            type: "consensus",
-            url,
-            consensus: status,
-            votes: [
-              {
-                validatorId,
-                status,
-                weight: 1,
-                latencyMs,
-                location,
-                timestamp: new Date(timestamp).getTime(),
-              },
-            ],
-            timestamp,
-          }),
-        },
-      ],
-    });
-
-    processedConsensus.add(key);
-  } catch (err) {
-    logError(`Error processing quorum: ${err}`);
+    res.json({ logs });
+  } catch (err: any) {
+    logError(`Failed to get historical logs: ${err.message}`);
+    res.status(500).json({ error: "Failed to get historical logs" });
   }
-}
+});
 
 
-async function startServer() {
-  try {
-    const app = express();
-    app.use(express.json());
+const server = http.createServer(app);
+const wsServer = new WebSocketServer({ server, path: "/ws" });
 
-   
-    app.get('/health', (_req: Request, res: Response) => {
-      res.json({ status: 'ok', service: 'aggregator' });
-    });
+wsServer.on("connection", (ws: WebSocket) => {
+  info("Validator connected via WebSocket");
 
-   
-    app.get("/api/historical-logs", (async (
-      req: Request,
-      res: Response
-    ): Promise<void> => {
-      try {
-        const { startDate, endDate } = req.query;
-        if (!startDate || !endDate) {
-          res.status(400).json({ error: "startDate and endDate are required " });
-          return;
-        }
+  ws.on("message", async (message) => {
+    try {
+      const payload = JSON.parse(message.toString()) as {
+        type: "vote";
+        validatorId: number;
+        url: string; // origin
+        status: Status;
+        latencyMs: number;
+        timestamp: string; // ISO
+        location?: string;
+        icmpLatencyMs?: number;
+        icmpStatus?: Status;
+        httpStatus?: Status;
+        httpCode?: number | null;
+        failureReason?: string;
+      };
 
-        const start = new Date(startDate as string);
-        const end = new Date(endDate as string);
-        const logs: any[] = [];
+      if (payload.type !== "vote") return;
 
-        
-        const files = fs
-          .readdirSync(LOGS_DIR)
-          .filter((f) => f.startsWith("validator-logs-"))
-          .sort();
-
-        for (const file of files) {
-          const fileDate = new Date(
-            file.replace("validator-logs-", "").replace(".json", "")
-          );
-          if (fileDate >= start && fileDate <= end) {
-            const filePath = path.join(LOGS_DIR, file);
-            const fileContent = fs.readFileSync(filePath, "utf-8");
-            const fileLogs = JSON.parse(fileContent);
-            logs.push(...fileLogs);
-          }
-        }
-
-       
-        if (process.env.S3_BUCKET) {
-          const s3Files = await s3Client.send(
-            new GetObjectCommand({
-              Bucket: process.env.S3_BUCKET,
-              Key: `${process.env.S3_PREFIX || 'logs'}/validator-logs-${start.toISOString().split("T")[0]}.json`,
-            })
-          );
-
-          if (s3Files.Body) {
-            const s3Logs = JSON.parse(await s3Files.Body.transformToString());
-            logs.push(...s3Logs);
-          }
-        }
-
-        const filteredLogs = logs
-          .filter((log) => {
-            const logDate = new Date(log.timestamp);
-            return logDate >= start && logDate <= end;
-          })
-          .sort(
-            (a, b) =>
-              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          );
-
-        res.json({ logs: filteredLogs });
-      } catch (err: any) {
-        logError(`Failed to get historical logs: ${err}`);
-        res.status(500).json({ error: `Failed to get historical logs` });
+      // Basic validation
+      if (
+        typeof payload.validatorId !== "number" ||
+        typeof payload.url !== "string" ||
+        (payload.status !== "UP" && payload.status !== "DOWN") ||
+        typeof payload.latencyMs !== "number" ||
+        typeof payload.timestamp !== "string"
+      ) {
+        logError(`Malformed vote payload: ${message.toString()}`);
+        return;
       }
-    }) as RequestHandler);
 
+      const key = `${payload.url}__${payload.timestamp}`;
 
-    const server = http.createServer(app);
+      // Store as individual vote in DB (no files, no S3)
+      try {
+        await prisma.validatorLog.create({
+          data: {
+            validatorId: payload.validatorId,
+            site: payload.url,
+            status: payload.status,
+            latency: payload.latencyMs,
+            timestamp: new Date(payload.timestamp),
+            location: payload.location ?? null,
+          },
+        });
+      } catch (dbErr: any) {
+        logError(`DB write failed for vote: ${dbErr.message}`);
+      }
 
+      // Publish raw vote to Kafka (optional but useful downstream)
+      try {
+        await sendToTopic(KAFKA_TOPIC, {
+          validatorId: payload.validatorId,
+          url: payload.url,
+          status: payload.status,
+          latencyMs: payload.latencyMs,
+          timestamp: payload.timestamp,
+          location: payload.location ?? "unknown",
+        });
+      } catch (e: any) {
+        logError(`Kafka publish (vote) failed: ${e.message}`);
+      }
 
-    const validatorWss = new WebSocketServer({
-      server,
-      path: "/ws",
-    });
+      voteCounter.inc({ status: payload.status });
+      voteLatencyHistogram.observe(payload.latencyMs / 1000); // seconds
 
-
-    validatorWss.on("connection", (ws) => {
-      info("Validator connected via WebSocket");
-
-      ws.on("message", async (message) => {
-        try {
-          const payload = JSON.parse(message.toString());
-
-          if (payload.type === "vote") {
-            const timestampMs = new Date(payload.timestamp).getTime();
-            const normalizedTimestamp = new Date(
-              Math.floor(timestampMs / 1000) * 1000
-            ).toISOString();
-
-
-            await writeLogToFile({
-              type: "vote",
-              ...payload,
-              timestamp: normalizedTimestamp,
-            });
-
-
-            voteCounter.inc({ status: payload.status });
-            voteLatencyHistogram.observe(payload.latencyMs / 1000);
-
-            await processQuorum({
-              ...payload,
-              timestamp: normalizedTimestamp,
-            });
-          }
-        } catch (err) {
-          logError(
-            `Error processing WebSocket message: ${(err as Error).message}`
-          );
-        }
+      voteBuffer[key] = voteBuffer[key] || [];
+      voteBuffer[key].push({
+        validatorId: payload.validatorId,
+        status: payload.status,
+        weight: 1,
+        latencyMs: payload.latencyMs,
+        location: payload.location ?? "unknown",
+        timestamp: Date.now(),
       });
 
-      ws.on("error", (err) => {
-        logError(`WebSocket error: ${err.message}`);
-      });
 
-      ws.on("close", () => {
-        info("Validator disconnected from WebSocket");
-      });
-    });
+      if (voteBuffer[key].length >= QUORUM) {
+        await processQuorumForKey(key);
+      }
+    } catch (err: any) {
+      logError(`Error processing WS message: ${err.message}`);
+    }
+  });
 
-    await connectKafka();
-    
-    server.listen(PORT, "0.0.0.0", () => {
-      info(`🧿 Aggregator listening on ${PORT}`);
+  ws.on("close", () => info("Validator disconnected from WebSocket"));
+  ws.on("error", (err) => logError(`WebSocket error: ${err.message}`));
+});
+
+
+async function processQuorumForKey(key: string) {
+  const startTime = Date.now();
+  if (processedConsensus.has(key)) return;
+
+  const entries = voteBuffer[key];
+  if (!entries || entries.length < QUORUM) return;
+
+  const [site, timestamp] = key.split("__");
+  const upCount = entries.filter((e) => e.status === "UP").length;
+  const consensus: Status = upCount >= entries.length - upCount ? "UP" : "DOWN";
+
+  processedConsensus.add(key);
+  delete voteBuffer[key];
+
+  // Metrics
+  consensusGauge.set({ url: site }, consensus === "UP" ? 1 : 0);
+
+  try {
+    await prisma.validatorLog.create({
+      data: {
+        validatorId: 0,
+        site,
+        status: consensus,
+        latency: 0,
+        timestamp: new Date(timestamp),
+      },
     });
-  } catch (err) {
-    logError(`Failed to start server: ${err}`);
-    process.exit(1);
+  } catch (dbErr: any) {
+    logError(`DB write failed for consensus: ${dbErr.message}`);
   }
+
+  const payload = { url: site, consensus, votes: entries, timestamp };
+  const msg = JSON.stringify(payload);
+  wsServer.clients.forEach((c) => {
+    if (c.readyState === c.OPEN) c.send(msg);
+  });
+
+  try {
+    await sendToTopic(KAFKA_CONSENSUS_TOPIC, payload);
+  } catch (e: any) {
+    logError(`Kafka publish (consensus) failed: ${e.message}`);
+  }
+
+  if (consensus === "DOWN") {
+    for (const e of entries.filter((x) => x.status === "DOWN")) {
+      const to = ALERT_EMAILS[e.location];
+      if (!to) continue;
+      try {
+        await mailTransporter.sendMail({
+          from: process.env.ALERT_FROM!,
+          to,
+          subject: `ALERT: ${site} DOWN in ${e.location}`,
+          text: `Validator ${e.validatorId}@${e.location} reported DOWN at ${timestamp}.`,
+        });
+        info(`Alert sent to ${to}`);
+      } catch (mailErr: any) {
+        logError(`Mail error: ${mailErr.message}`);
+      }
+    }
+  }
+
+  const processingTime = (Date.now() - startTime) / 1000;
+  voteLatencyHistogram.observe({ url: site }, processingTime);
+  info(
+    `✔️ Consensus for ${site}@${timestamp}: ${consensus} (${upCount}/${entries.length} UP)`
+  );
 }
 
+process.on("unhandledRejection", (err) => {
+  logError(`UNHANDLED REJECTION: ${(err as Error).stack || err}`);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  logError(`UNCAUGHT EXCEPTION: ${(err as Error).stack || err}`);
+  process.exit(1);
+});
 
-startServer(); 
+server.listen(SERVER_PORT, "0.0.0.0", () => {
+  info(`🧿 Aggregator listening on ${SERVER_PORT}`);
+});

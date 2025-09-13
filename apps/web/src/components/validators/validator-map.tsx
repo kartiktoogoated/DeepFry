@@ -84,7 +84,7 @@ const ValidatorMap = () => {
   useEffect(() => {
     // open WS
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${window.location.host}/api`)
+    const ws = new WebSocket(`${proto}://api.deepfry.tech/ws`)
 
     ws.onmessage = (ev) => {
       try {

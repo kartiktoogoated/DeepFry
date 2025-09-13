@@ -199,7 +199,7 @@ const PingChart: React.FC<PingChartProps> = ({ isStarted, validatorId }) => {
     if (!isStarted) return;
     
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const socket = new WebSocket(`${proto}://${window.location.host}/api/ws`)
+      const socket = new WebSocket(`${proto}://api.deepfry.tech/ws`)
     wsRef.current = socket
 
     socket.onmessage = (ev) => {

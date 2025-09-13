@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Globe, Activity, Clock, Zap, ExternalLink, Loader2, Users, CalendarIcon } from 'lucide-react'
 import { comingSoon } from '@/lib/utils'
-import LiveConsensusStatus from '@/components/ui/LiveConsensusStatus'
+// import LiveConsensusStatus from '@/components/ui/LiveConsensusStatus'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
@@ -199,7 +199,7 @@ const ClientDashboard: React.FC = () => {
                 </div>
 
                 {/* Live Consensus Status */}
-                <LiveConsensusStatus monitoredUrls={sites.map(s => s.url)} />
+                {/* <LiveConsensusStatus monitoredUrls={sites.map(s => s.url)} /> */}
 
                 {/* stats */}
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
@@ -257,7 +257,7 @@ const ClientDashboard: React.FC = () => {
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <LiveConsensusStatus compact monitoredUrls={sites.map(s => s.url)} />
+                      {/* <LiveConsensusStatus compact monitoredUrls={sites.map(s => s.url)} /> */}
                     </CardContent>
                   </Card>
                 </div>

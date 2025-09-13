@@ -22,9 +22,11 @@ export default function ValidatorsTab({ siteId }: { siteId: number }) {
 
   useEffect(() => {
     (async () => {
+      const token = localStorage.getItem("token")
+
       // history → unique IDs
       const hr = await fetch(`/api/websites/${siteId}/history?limit=100`, {
-        credentials: 'include',
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!hr.ok) return
       const { logs } = await hr.json() as { logs: Array<{ validatorId: number }> }

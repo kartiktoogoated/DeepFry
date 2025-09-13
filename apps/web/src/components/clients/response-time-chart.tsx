@@ -110,10 +110,11 @@ export default function ResponseTimeChart({ siteId, siteUrl }: Props) {
       return
     }
 
-    const res = await fetch(
-      `/api/websites/${siteId}/history?limit=60`,
-      { credentials: 'include' }
-    )
+    const token = localStorage.getItem("token")
+
+    const res = await fetch(`/api/websites/${siteId}/history?limit=60`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
     if (!res.ok) return
     const json = await res.json() as { logs: HistoryLog[] }
     historyCache[siteId] = json.logs
@@ -140,7 +141,7 @@ export default function ResponseTimeChart({ siteId, siteUrl }: Props) {
     loadHistory()
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const socket = new WebSocket(`${proto}://${window.location.host}/api/ws`)
+    const socket = new WebSocket(`${proto}://api.deepfry.tech/ws`)
     wsRef.current = socket
 
     socket.onmessage = ev => {

@@ -39,41 +39,42 @@ const AddSiteDialog = ({ open, onOpenChange, onAdd }: AddSiteDialogProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
+  
     if (!url.trim()) {
       setError('URL is required');
       return;
     }
-
-    // validate URL
+  
     try {
       new URL(url);
     } catch {
       setError('Please enter a valid URL including http:// or https://');
       return;
     }
-
+  
     setIsValidating(true);
-
+  
     try {
+      const token = localStorage.getItem('token'); // 👈 grab token
+  
       const res = await fetch('/api/websites', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}), // 👈 add Authorization header
         },
-        credentials: 'include',
-        body: JSON.stringify({ url: url.trim(), description: description.trim() }),
+        body: JSON.stringify({
+          url: url.trim(),
+          description: description.trim(),
+        }),
       });
-
+  
       const data = await res.json();
-
+  
       if (!res.ok) {
         setError(data.message || 'Failed to add website');
       } else {
-        // call onAdd with the created Website record
         onAdd(data.website as Website);
-
-        // reset form
         setUrl('');
         setDescription('');
         onOpenChange(false);
@@ -83,7 +84,7 @@ const AddSiteDialog = ({ open, onOpenChange, onAdd }: AddSiteDialogProps) => {
     } finally {
       setIsValidating(false);
     }
-  };
+  };  
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

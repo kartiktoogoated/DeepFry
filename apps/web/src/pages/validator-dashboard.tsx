@@ -91,7 +91,7 @@ const ValidatorDashboard: React.FC = () => {
     // Use env or fallback to window.location.host
     const host = import.meta.env.VITE_AGGREGATOR_BASE_URL?.replace(/^https?:\/\//, '') || window.location.host;
     const proto = host.includes('localhost') ? 'ws' : 'wss';
-    const ws = new WebSocket(`${proto}://${host}/api/ws`);
+    const ws = new WebSocket(`${proto}://api.deepfry.tech/ws`);
     wsRef.current = ws
 
     ws.onopen = () => {

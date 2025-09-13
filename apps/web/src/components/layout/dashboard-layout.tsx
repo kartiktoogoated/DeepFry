@@ -60,7 +60,7 @@ export default function DashboardLayout({
   // open WS & listen for first‐ping and high‐latency
   useEffect(() => {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/ws`);
+    const ws = new WebSocket(`${proto}://api.deepfry.tech/ws`);
 
     ws.onmessage = (ev) => {
       try {

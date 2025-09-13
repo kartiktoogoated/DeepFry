@@ -37,8 +37,10 @@ export default function UptimeChart({ siteId, siteUrl }: UptimeChartProps) {
 
   useEffect(() => {
     const fetchHistory = async () => {
-      const res = await fetch(`/api/websites/${siteId}/history?limit=1000`, {
-        credentials: 'include',
+      const token = localStorage.getItem("token")
+
+      const res = await fetch(`/api/websites/${siteId}/history?limit=60`, {
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) return
       const json = await res.json()
@@ -69,7 +71,7 @@ export default function UptimeChart({ siteId, siteUrl }: UptimeChartProps) {
 
     // live WS updates
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const socket = new WebSocket(`${proto}://${window.location.host}/api/ws`)
+    const socket = new WebSocket(`${proto}://api.deepfry.tech/ws`)
 
     socket.onmessage = ev => {
       try {

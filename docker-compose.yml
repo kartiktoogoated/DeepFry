@@ -10,7 +10,7 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
     networks:
-      - raftnet
+      raftnet:
 
   grafana:
     image: grafana/grafana
@@ -19,7 +19,7 @@ services:
     volumes:
       - grafana-storage:/var/lib/grafana
     networks:
-      - raftnet
+      raftnet:
 
   db:
     image: postgres:14-alpine
@@ -33,7 +33,9 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - db
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
@@ -42,7 +44,9 @@ services:
     ports:
       - "2181:2181"
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - zookeeper
 
   kafka:
     image: confluentinc/cp-kafka:7.3.0
@@ -56,7 +60,9 @@ services:
     depends_on:
       - zookeeper
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - kafka
 
   aggregator:
     build:
@@ -72,7 +78,9 @@ services:
       - db
       - kafka
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - aggregator
     command: >
       sh -c "
         echo '🕒 Waiting for DB...' &&
@@ -100,7 +108,9 @@ services:
       - db
       - kafka
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - api-server
     command: >
       sh -c "
         echo '🕒 Waiting for DB...' &&
@@ -124,7 +134,9 @@ services:
       - db
       - aggregator
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - validator1
     cap_add:
       - NET_RAW
     command: >
@@ -152,7 +164,9 @@ services:
       - db
       - aggregator
     networks:
-      - raftnet
+      raftnet:
+        aliases:
+          - validator2
     cap_add:
       - NET_RAW
     command: >

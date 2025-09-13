@@ -14,7 +14,7 @@ import { register as promRegister } from "../../metrics";
 import createSimulationRouter from "../../routes/api/v1/simulation";
 import { WebSocketServer } from "ws";
 import http from "http";
-import prisma from "../../prismaClient"; 
+import prisma from "../../prismaClient";
 
 interface ValidatorStatus {
   validatorId: number;
@@ -44,42 +44,49 @@ const validatorId = Number(process.env.VALIDATOR_ID);
 const location = process.env.LOCATION || "unknown";
 const pingInterval = Number(process.env.PING_INTERVAL_MS) || 30000;
 
-// keep per-site status in memory
+const validator = new Validator(validatorId, location);
 const siteChecks: Record<string, any> = {};
 
 async function checkAllWebsites() {
   const websites = await prisma.website.findMany();
   for (const site of websites) {
     try {
-      const validator = new Validator(validatorId, location);
       const { vote, latency } = await validator.checkWebsite(site.url);
 
       siteChecks[site.id] = {
         siteId: site.id,
         url: site.url,
-        lastCheck: { vote, latency, timestamp: new Date().toISOString() }
+        lastCheck: { vote, latency, timestamp: new Date().toISOString() },
       };
 
-      info(`Validator ${validatorId}@${location} → ${site.url}: ${vote.status} (${latency}ms)`);
+      info(
+        `Validator ${validatorId}@${location} → ${site.url}: ${vote.status} (${latency}ms)`
+      );
     } catch (error) {
-      logError(`Validator ${validatorId} failed for ${site.url}: ${error}`);
+      logError(
+        `Validator ${validatorId} failed for ${site.url}: ${error}`
+      );
     }
   }
 }
 
-// run every X ms
+checkAllWebsites();
+
 setInterval(checkAllWebsites, pingInterval);
 
 app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ["http://localhost:5173"],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(",") || [
+      "http://localhost:5173",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 
-// Metrics
 app.get("/metrics", async (_req, res) => {
   try {
     res.setHeader("Content-Type", promRegister.contentType);
@@ -90,12 +97,10 @@ app.get("/metrics", async (_req, res) => {
   }
 });
 
-// Health
 app.get("/health", (_req, res: Response<HealthResponse>) => {
   res.json({ status: "ok", validatorId, location });
 });
 
-// Status → show all tracked sites
 app.get("/status", (_req, res: Response<ValidatorStatus>) => {
   res.json({
     validatorId,
@@ -124,7 +129,6 @@ process.on("SIGTERM", () => {
   });
 });
 
-// mount sim router
 app.use("/api/simulate", createSimulationRouter(wss));
 
 server.listen(PORT, "0.0.0.0", () => {

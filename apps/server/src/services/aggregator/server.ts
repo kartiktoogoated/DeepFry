@@ -252,35 +252,24 @@ async function processQuorumForKey(key: string) {
   processedConsensus.add(key);
   delete voteBuffer[key];
 
-  // Metrics
+  // Metrics only — no DB insert for consensus
   consensusGauge.set({ url: site }, consensus === "UP" ? 1 : 0);
 
-  try {
-    await prisma.validatorLog.create({
-      data: {
-        validatorId: 0,
-        site,
-        status: consensus,
-        latency: 0,
-        timestamp: new Date(timestamp),
-      },
-    });
-  } catch (dbErr: any) {
-    logError(`DB write failed for consensus: ${dbErr.message}`);
-  }
-
+  // Broadcast consensus over WS
   const payload = { url: site, consensus, votes: entries, timestamp };
   const msg = JSON.stringify(payload);
   wsServer.clients.forEach((c) => {
     if (c.readyState === c.OPEN) c.send(msg);
   });
 
+  // Publish consensus to Kafka (optional)
   try {
     await sendToTopic(KAFKA_CONSENSUS_TOPIC, payload);
   } catch (e: any) {
     logError(`Kafka publish (consensus) failed: ${e.message}`);
   }
 
+  // Send alert emails if DOWN
   if (consensus === "DOWN") {
     for (const e of entries.filter((x) => x.status === "DOWN")) {
       const to = ALERT_EMAILS[e.location];
@@ -305,6 +294,7 @@ async function processQuorumForKey(key: string) {
     `✔️ Consensus for ${site}@${timestamp}: ${consensus} (${upCount}/${entries.length} UP)`
   );
 }
+
 
 process.on("unhandledRejection", (err) => {
   logError(`UNHANDLED REJECTION: ${(err as Error).stack || err}`);
